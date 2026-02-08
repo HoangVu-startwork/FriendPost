@@ -1,0 +1,78 @@
+export default function LikeButton({ myReaction, postId }) {
+    const [open, setOpen] = useState(false);
+    const [reaction, setReaction] = useState(myReaction || null);
+  
+    const reactions = useReactionStore(state => state.reactions);
+    const fetchReactions = useReactionStore(state => state.fetchReactions);
+  
+    useEffect(() => {
+      fetchReactions();
+    }, []);
+  
+    // Khi đổi post / refetch → sync lại reaction từ backend
+    useEffect(() => {
+      setReaction(myReaction || null);
+    }, [myReaction]);
+  
+    const handleSelect = (r) => {
+      setReaction(r);
+      setOpen(false);
+  
+      // TODO: call API lưu reaction
+      // Likebuttons.react(postId, r.code);
+    };
+  
+    const likeReaction = reactions.find(r => r.code === "like");
+  
+    return (
+      <div
+        className="relative flex justify-center"
+        onMouseEnter={() => setOpen(true)}
+        onMouseLeave={() => setOpen(false)}
+      >
+        {/* Popup reactions */}
+        {open && reactions.length > 0 && (
+          <div className="absolute -top-12 bg-white shadow-lg rounded-full px-2 py-1 flex gap-2 animate-fade-in z-10">
+            {reactions.map((r) => (
+              <button
+                key={r.code}
+                onClick={() => handleSelect(r)}
+                className="text-2xl hover:scale-125 transition-transform"
+                title={r.label}
+              >
+                {r.icon}
+              </button>
+            ))}
+          </div>
+        )}
+  
+        {/* Like button */}
+        <button
+          onClick={() => {
+            if (reaction) {
+              setReaction(null);
+              // TODO: remove reaction API
+              // Likebuttons.remove(postId);
+            } else if (likeReaction) {
+              handleSelect(likeReaction);
+            }
+          }}
+          className={`w-full flex items-center justify-center gap-2 py-2 px-3 rounded-lg hover:bg-gray-100 ${
+            reaction ? reaction.color || "text-blue-600" : "text-gray-600"
+          }`}
+        >
+          {reaction ? (
+            <>
+              <span className="text-lg">{reaction.icon}</span>
+              <span className={reaction.color}>{reaction.label}</span>
+            </>
+          ) : (
+            <>
+              <ThumbsUp />
+              <span>Thích</span>
+            </>
+          )}
+        </button>
+      </div>
+    );
+  }
