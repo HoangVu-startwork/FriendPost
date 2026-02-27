@@ -1,32 +1,26 @@
 const messageService = require('../services/messageService');
 
 
-exports.sendMessage = async (req, res) => {
-    try {
-        const senderId = req.user.id;
-        // thường được gắn vào request sau khi xác thực JWT hoặc session thành công.
-        // Có nghĩa là người gửi đã đăng nhập rồi.
-        const { receiverId, content, replyToId } = req.body;
-        const message = await messageService.sendMessage(senderId, receiverId, content, replyToId);
-        res.json({ message: 'Gửi tin nhắn thành công', data: message });
-    } catch (err) {
-        res.status(400).json({ message: err.message });
-    }
-};
+
 
 exports.sendMessageImg = async (req, res) => {
     try {
+        console.log("id + " + req.user.id)
         const senderId = req.user.id;
-        const { receiverId, content, contentType, replyToId } = req.body;
+        const { receiverId, content, contentType, replyToId, conversationId } = req.body;
         const filePath = req.file ? req.file.path : null; // Lấy đường dẫn ảnh upload tạm
-
+        const originalName = req.file ? req.file.originalname : null;
+        console.log(filePath)
         const result = await messageService.sendMessageimage(
             senderId,
             receiverId,
             content,
             contentType,
             filePath,
-            replyToId
+            originalName,
+            replyToId,
+            conversationId,
+            req.io
         )
 
         res.json({
@@ -67,3 +61,46 @@ exports.getMessagesblock = async (req, res) => {
         res.status(400).json({ success: false, message: error.message });
     }
 }
+
+exports.markAsReadUpTo = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { conversationId, lastMessageId } = req.body;
+
+        if (!conversationId || !lastMessageId) {
+            return res.status(400).json({
+                message: "Thiếu conversationId hoặc lastMessageId"
+            });
+        }
+
+        const updatedCount = await messageService.markAsReadUpTo(
+            userId,
+            conversationId,
+            lastMessageId
+        );
+
+        console.log(updatedCount)
+        const now = new Date();
+
+        // 🔥 Emit socket nếu có tin được cập nhật
+        if (updatedCount > 0) {
+            req.io.to(`conversation_${conversationId}`).emit("messagesRead", {
+                conversationId,
+                readerId: userId,
+                lastMessageId,
+                isRead: true,
+                updatedAt: now
+            });
+        }
+
+        return res.json({
+            success: true,
+            updatedCount
+        });
+
+    } catch (error) {
+        return res.status(400).json({
+            message: error.message
+        });
+    }
+};

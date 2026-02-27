@@ -4,13 +4,11 @@ const { verifyToken } = require('../middlewares/authMiddleware');
 const messageController = require('../controllers/messageController');
 const upload = require('../middlewares/upload');
 
-router.post('/send', verifyToken, messageController.sendMessage);
-
 
 router.get('/:conversationId', verifyToken, messageController.getMessages);
 router.get('/getblock/:conversationId', verifyToken, messageController.getMessagesblock);
 
 // Gửi tin nhắn text hoặc ảnh
-router.post('/sendimg', upload.single('file'), messageController.sendMessageImg);
-
+router.post('/sendimg', verifyToken, upload.single('file'), messageController.sendMessageImg);
+router.put('/mark-read', verifyToken, messageController.markAsReadUpTo);
 module.exports = router;

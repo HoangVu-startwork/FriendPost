@@ -54,7 +54,7 @@ exports.acceptFriendRequest = async (req, res) => {
         const receiverId = req.user.id;
         const { id } = req.params;
 
-        const updated = await friendService.acceptFriendRequest(receiverId, id);
+        const updated = await friendService.acceptFriendRequest(receiverId, id, req.io);
         res.status(200).json({ message: 'Đã chấp nhận lời mời kết bạn', friendRequest: updated });
     } catch (error) {
         res.status(400).json({ message: error.message });

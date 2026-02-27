@@ -3,16 +3,16 @@ const jwt = require('jsonwebtoken'); // nếu dùng JWT
 
 module.exports = (io) => {
   io.on("connection", (socket) => {
-    console.log("⚡ Socket connected:", socket.id);
+    console.log("⚡ Socket connected 4ddd:", socket.id);
 
     socket.on("joinUser", (userId) => {
-      if (!userId) return console.log("❗ Missing userId");
+      if (!userId) return console.log("❗ Missing userId 4ddd");
       socket.join(userId.toString());
-      console.log(`📌 User ${userId} joined room. Socket: ${socket.id}`);
+      console.log(`📌 User ${userId} joined room. Socket 4ddd: ${socket.id}`);
     });
 
     socket.on("disconnect", () => {
-      console.log("❌ Socket disconnected:", socket.id);
+      console.log("❌ Socket disconnected 4ddd:", socket.id);
     });
   });
 };

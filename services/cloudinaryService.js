@@ -41,6 +41,7 @@ exports.uploadToCloudinary = async (filePath, folderName = 'uploads', originalNa
       url: result.secure_url,
       publicId: result.public_id,
       type: result.resource_type,
+      format: result.format,
       originalName: result.original_filename + ext
     };
 

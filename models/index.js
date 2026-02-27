@@ -25,6 +25,7 @@ const PostReaction = require('./PostReaction');
 const Reaction = require('./Reaction');
 const UserProfileView = require('./UserProfileView');
 const PostView = require('./PostView');
+const Topic = require('./Topic');
 
 User.hasOne(UserInformation, {
   foreignKey: 'userId',
@@ -92,9 +93,20 @@ Participant.belongsTo(Conversation, { foreignKey: 'conversationId' });
 Participant.belongsTo(User, { foreignKey: 'userId' });
 User.hasMany(Participant, { foreignKey: 'userId', as: 'participations' });
 
+Conversation.belongsTo(User, {
+  foreignKey: 'userOneId',
+  as: 'userOne'
+});
+
+Conversation.belongsTo(User, {
+  foreignKey: 'userTwoId',
+  as: 'userTwo'
+});
+
+
 // Conversation ↔ Message
-Conversation.hasMany(Message, { foreignKey: 'conversationId', as: 'messages' });
-Message.belongsTo(Conversation, { foreignKey: 'conversationId' });
+Conversation.hasMany(Message, { as: 'messages', foreignKey: 'conversationId' });
+Message.belongsTo(Conversation, { as: 'conversation', foreignKey: 'conversationId' });
 
 // User ↔ Message
 User.hasMany(Message, { foreignKey: 'senderId', as: 'sentMessages' });
@@ -103,6 +115,7 @@ Message.belongsTo(User, { foreignKey: 'senderId', as: 'sender' });
 // Message.replyTo (self-association)
 Message.belongsTo(Message, { foreignKey: 'replyToId', as: 'replyTo' });
 Message.hasMany(Message, { foreignKey: 'replyToId', as: 'replies' });
+
 
 // Conversation.createdBy -> User (optional)
 Conversation.belongsTo(User, { foreignKey: 'createdBy', as: 'creator' });
@@ -157,6 +170,18 @@ User.hasMany(UserLogin, { foreignKey: 'userId', as: 'logins' });
 UserLogin.belongsTo(User, { foreignKey: 'userId', as: 'user' });
 
 
+Topic.hasMany(Conversation, {
+    foreignKey: 'topicId',
+    as: 'conversations',
+    onDelete: 'SET NULL',
+    onUpdate: 'CASCADE'
+});
+
+Conversation.belongsTo(Topic, {
+    foreignKey: 'topicId',
+    as: 'topic'
+});
+
 module.exports = {
   sequelize,
   User,
@@ -178,5 +203,6 @@ module.exports = {
   UserJob,
   UserRelationship,
   UserInformation,
-  Notificationrelationship
+  Notificationrelationship,
+  Topic
 };
