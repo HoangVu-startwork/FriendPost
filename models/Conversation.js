@@ -23,6 +23,11 @@ const Conversation = sequelize.define('Conversation', {
     allowNull: true,
   },
 
+  avatConversation: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+
   createdBy: { // ID người tạo nhóm (group owner)
     type: DataTypes.INTEGER,
     allowNull: true,
@@ -43,7 +48,16 @@ const Conversation = sequelize.define('Conversation', {
     allowNull: true,
   },
 
+  topicId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+  },
 
+  icon: {
+    type: DataTypes.STRING,
+    defaultValue: '👍'
+  }
+  
 }, {
   tableName: 'conversations',
   timestamps: true,

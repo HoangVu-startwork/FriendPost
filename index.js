@@ -7,18 +7,21 @@ const FriendRequest = require('./routes/friendRoutes');
 const Message = require('./routes/messageRoutes');
 const ChatStatus = require('./routes/chatStatusRoutes');
 const UserIntroduce = require('./routes/userintroduceRoutes');
+const Conversation = require('./routes/conversationRoutes');
 const Post = require('./routes/postRoutes');
 const app = express();
 const cors = require('cors');
+const cookieParser = require("cookie-parser");
 
 app.use(cors({
   origin: 'http://localhost:3000',
+  credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
 app.use(express.json());
-
+app.use(cookieParser());
 const server = http.createServer(app);
 
 
@@ -36,10 +39,25 @@ io.on("connection", (socket) => {
     console.log(`📌 User ${userId} joined room ${userId}`);
   });
 
+    // 🔹 Thêm room theo conversationId
+  socket.on("joinConversation", (conversationId) => {
+    socket.join(`conversation_${conversationId}`);
+    console.log(`💬 Joined conversation_${conversationId}`);
+  });
+
+  socket.on("leaveConversation", (conversationId) => {
+    socket.leave(`conversation_${conversationId}`);
+    console.log(`🚪 Left conversation_${conversationId}`);
+  });
+
   socket.on("disconnect", () => {
     console.log("❌ User disconnected:", socket.id);
   });
+
+
 });
+
+
 
 app.use((req, res, next) => {
   req.io = io;
@@ -54,6 +72,7 @@ app.use('/api/message', Message);
 app.use('/api/chatstatus', ChatStatus);
 app.use('/api', Post);
 app.use('/api', UserIntroduce);
+app.use('/api', Conversation);
 
 // app.listen(process.env.PORT , async () => {
 //   try {

@@ -4,7 +4,8 @@ const Conversation = require('../models/Conversation');
 const ChatStatus = require('../models/ChatStatus');
 const Notify = require('../models/Notify');
 const { Op } = require('sequelize');
- 
+const Topic = require('../models/Topic');
+
 
 // ======= GỬI LỜI MỜI KẾT BẠN (đã có) ======= sử dụng index 
 exports.sendFriendRequest = async (senderId, receiverPhone, message) => {
@@ -120,36 +121,6 @@ exports.acceptFriendRequest1 = async (receiverId, requestId) => {
     return request;
 }
 
-exports.acceptFriendRequest2 = async (receiverId, requestId) => {
-    const request = await FriendRequest.findByPk(requestId);
-    if (!request) throw new Error('Không tìm thấy lời mời kết bạn');
-
-    request.status = 'accepted';
-    request.acceptedAt = new Date();
-    await request.save();
-
-    const existingConversation = await Conversation.findOne({
-        where: {
-            type: 'private',
-            [require('sequelize').Op.or]: [
-                { userOneId: request.senderId, userTwoId: request.receiverId },
-                { userOneId: request.receiverId, userTwoId: request.senderId },
-            ]
-        }
-    });
-
-    if (!existingConversation) {
-        await Conversation.create({
-            type: 'private',
-            userOneId: request.senderId,
-            userTwoId: request.receiverId,
-        });
-    }
-
-    return request;
-}
-
-
 // receiverId: là ID của người đang đăng nhập (người nhận lời mời kết bạn).
 // requestId: là ID của lời mời kết bạn mà họ đang chấp nhận.
 
@@ -175,7 +146,7 @@ exports.acceptFriendRequest2 = async (receiverId, requestId) => {
 //   )
 // LIMIT 1;
 // (:senderId và :receiverId là tham số truyền vào — ở đây là request.senderId và request.receiverId.)
-exports.acceptFriendRequest = async (receiverId, requestId) => {
+exports.acceptFriendRequest = async (receiverId, requestId, io) => {
     // Lấy yêu cầu kết bạn
     const request = await FriendRequest.findByPk(requestId);
     if (!request) throw new Error('Không tìm thấy lời mời kết bạn');
@@ -210,7 +181,7 @@ exports.acceptFriendRequest = async (receiverId, requestId) => {
     request.status = 'accepted';
     request.acceptedAt = new Date();
     await request.save();
-    
+
     await Notify.update(
         {
             message: "đã chấp nhận lời mời kết bạn của bạn",
@@ -236,6 +207,7 @@ exports.acceptFriendRequest = async (receiverId, requestId) => {
         },
     });
 
+    let isNewConversation = false;
     // Nếu chưa có, tạo mới Conversation
     if (!conversation) {
         conversation = await Conversation.create({
@@ -243,9 +215,12 @@ exports.acceptFriendRequest = async (receiverId, requestId) => {
             userOneId: request.senderId,
             userTwoId: request.receiverId,
             createdBy: receiverId,
+            topicId: '1',
         });
 
+        isNewConversation = true;
         console.log(`✅ Conversation mới được tạo ID: ${conversation.id}`);
+        console.log(" 1 --" + isNewConversation)
     }
 
     // Kiểm tra xem đã có ChatStatus cho cuộc trò chuyện chưa
@@ -267,6 +242,34 @@ exports.acceptFriendRequest = async (receiverId, requestId) => {
         console.log(`✅ ChatStatus mới được tạo cho conversationId: ${conversation.id}`);
     }
 
+    console.log(" 2 --  " + isNewConversation)
+    if (isNewConversation) {
+
+        // Lấy thông tin receiver
+        const receiverUser = await User.findByPk(request.receiverId, {
+            attributes: ['id', 'username', 'avatUrl']
+        })
+
+        const topicsid = 1;
+        const topics = await Topic.findByPk(topicsid, {
+            attributes: ['id', 'label', 'title', 'img', 'color', 'color_1', 'color_2', 'color_icon']
+        })
+        const payload = {
+            id: conversation.id,
+            type: conversation.type,
+            userOneId: conversation.userOneId,
+            userTwoId: conversation.userTwoId,
+            createdAt: conversation.createdAt,
+            friend: receiverUser?.dataValues,
+            topic: topics
+
+        };
+        console.log(payload)
+        io.to(String(request.senderId)).emit("newConversation", payload);
+        io.to(String(request.receiverId)).emit("newConversation", payload);
+
+        console.log("🚀 Emit newConversation realtime");
+    }
     return request;
 }
 
@@ -678,7 +681,7 @@ exports.getAccepteBirthday = async (userId) => {
 
         const parts = friend.ngaysinh.split("/");
         if (parts.length !== 3) return;
-        
+
         const month = parseInt(parts[1]);
 
         if (!month || month < 1 || month > 12) return;

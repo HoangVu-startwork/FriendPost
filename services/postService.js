@@ -64,7 +64,7 @@ exports.createPostFb = async (content, file, userId, backgroundColor, privacy, u
             else if (mime.startsWith("video")) type = "video";
 
             const uploadResult = await uploadToCloudinary(
-                file.path,
+                file.buffer,
                 type,
                 file.originalname // QUAN TRỌNG
             );

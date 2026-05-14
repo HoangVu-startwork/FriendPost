@@ -1,6 +1,7 @@
 const cloudinary = require('../config/cloudinary');
 const fs = require('fs');
 const path = require('path');
+const { Readable } = require('stream');
 
 /**
  * Upload file lên Cloudinary.
@@ -8,8 +9,8 @@ const path = require('path');
  * @param {string} folderName - Tên thư mục Cloudinary (mặc định là 'uploads').
  * @returns {Promise<{ url: string, publicId: string, type: string }>}
  */
-
-exports.uploadToCloudinary = async (filePath, folderName = 'uploads', originalName) => {
+// UPLOAD qua thư mục trung gian uploads
+exports.uploadToCloudinaryfile = async (filePath, folderName = 'uploads', originalName) => {
   try {
     const ext = path.extname(originalName); // .pdf, .docx
     const baseName = path.basename(originalName, ext); // tenfile
@@ -41,6 +42,7 @@ exports.uploadToCloudinary = async (filePath, folderName = 'uploads', originalNa
       url: result.secure_url,
       publicId: result.public_id,
       type: result.resource_type,
+      format: result.format,
       originalName: result.original_filename + ext
     };
 
@@ -51,25 +53,38 @@ exports.uploadToCloudinary = async (filePath, folderName = 'uploads', originalNa
 };
 
 
-exports.uploadToCloudinary1 = async (filePath, folderName = 'uploads') => {
-  try {
-    const result = await cloudinary.uploader.upload(filePath, {
-      resource_type: 'auto', // Tự nhận dạng ảnh hoặc video
-      folder: folderName,
-    });
+exports.uploadToCloudinary = (fileBuffer, folderName = 'uploads', originalName) => {
+  return new Promise((resolve, reject) => {
+    const ext = path.extname(originalName);
+    const baseName = path.basename(originalName, ext);
 
-    // Xóa file tạm sau khi upload
-    fs.unlinkSync(filePath);
+    // Tạo stream để đẩy buffer lên Cloudinary
+    const uploadStream = cloudinary.uploader.upload_stream(
+      {
+        resource_type: 'auto',
+        folder: folderName,
+        public_id: `${baseName}-${Date.now()}`, // Cloudinary sẽ tự xử lý nếu trùng hoặc bạn có thể thêm suffix
+      },
+      (error, result) => {
+        if (error) {
+          console.error('❌ Upload thất bài:', error);
+          return reject(new Error('Không thể upload lên Cloudinary'));
+        }
+        resolve({
+          url: result.secure_url,
+          publicId: result.public_id,
+          type: result.resource_type,
+          format: result.format,
+        });
+      }
+    );
 
-    return {
-      url: result.secure_url,
-      publicId: result.public_id,
-      type: result.resource_type, // image hoặc video
-    };
-  } catch (error) {
-    console.error('❌ Upload thất bại:', error);
-    throw new Error('Không thể upload lên Cloudinary');
-  }
+    // Ghi buffer vào stream
+    const readableStream = new Readable();
+    readableStream.push(fileBuffer);
+    readableStream.push(null);
+    readableStream.pipe(uploadStream);
+  });
 };
 
 /**

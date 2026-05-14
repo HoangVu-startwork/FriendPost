@@ -56,9 +56,16 @@ exports.login = async (req, res) => {
         const { identifier, password } = req.body;
         const { token, user, role } = await userService.login(identifier, password);
 
+        res.cookie("accessToken", token, {
+            httpOnly: true,     // Trình duyệt không cho JS đọc cookie (chống XSS)
+            secure: false,      // true nếu production có HTTPS
+            // secure: process.env.NODE_ENV === 'production',   // Chỉ gửi qua HTTPS khi đã deploy (production)
+            sameSite: "strict", // Chống tấn công CSRF
+            maxAge: 5 * 24 * 60 * 60 * 1000 // 5 ngày
+        });
+
         res.status(200).json({
             message: 'Đăng nhập thành công',
-            token,
             user: { id: user.id, username: user.username, email: user.email, role: role.name }
         })
     } catch (error) {
@@ -109,6 +116,27 @@ exports.updateAvatar = async (req, res) => {
     }
 }
 
+exports.uploadavatUrlfacebooks = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        // Kiểm tra nếu không có file (Multer xử lý xong sẽ nằm trong req.file)
+        if (!req.file) {
+            return res.status(400).json({ message: 'Vui lòng chọn ảnh để tải lên.' });
+        }
+
+        const newAvatUrlfacebook = await userService.uploadavatUrlfacebook(userId, req.file);
+
+        res.status(200).json({
+            message: 'Cập nhật ảnh đại diện thành công',
+            avatUrlfacebooks: newAvatUrlfacebook,
+        })
+    } catch (error) {
+        console.error('❌ Lỗi cập nhật avatar:', error);
+        res.status(400).json({ message: error.message });
+    }
+}
+
+
 exports.registersMangUsers = async (req, res) => {
     try {
         const users = await userService.registerUsersMang(req.body);
@@ -120,6 +148,34 @@ exports.registersMangUsers = async (req, res) => {
         res.status(400).json({ error: err.message });
     }
 };
+
+
+exports.logout = async (req, res) => {
+    try {
+        // gọi service
+        await userService.logoutUser(req.cookies.token);
+        // Xoá cookie trên trình duyệt
+        res.clearCookie('accessToken', {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production', // Chỉ gửi qua HTTPS khi deploy
+            sameSite: 'strict',
+            path: '/' 
+        });
+
+        return res.status(200).json({
+            status: 'success',
+            message: 'Đăng xuất thành công!'
+        });
+    } catch (err) {
+         return res.stats(500).json({
+            status: 'error',
+            message: 'Có lỗi xảy ra khi đăng xuất'
+         })
+    }
+}
+
+
+
 
 // -----------------------------------------------------------------------------------------------
 // try {

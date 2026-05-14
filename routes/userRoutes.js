@@ -7,7 +7,11 @@ const upload = require('../middlewares/upload');
 
 router.post('/register', userController.register);
 router.post('/register_admin', userController.registerAdmin);
+// Đăng nhập
 router.post('/login', userController.login);
+// Đăng xuất
+router.post('/logout', userController.logout);
+
 router.get('/verify', verifyToken, userController.getUserInfo);
 
 // thêm user mảng registersUsers
@@ -15,6 +19,8 @@ router.post('/registersmang', userController.registersMangUsers);
 
 
 router.put('/avatar/:id', upload.single('avatar'), userController.updateAvatar);
+router.put('/avatUrlfacebook', verifyToken, upload.single('avatUrlfacebook'), userController.uploadavatUrlfacebooks)
+
 // Chỉ cho phép các quyền khác "khachhang" truy cập
 router.get('/statistics', verifyToken, verifyTokenAdmin(['admin', 'admin_user']), userController.getUserStatistics);
 module.exports = router;
