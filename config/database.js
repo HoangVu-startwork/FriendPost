@@ -1,34 +1,34 @@
 // config/database.js
-const { Sequelize } = require('sequelize');
-require('dotenv').config();
-const fs = require('fs');
-const path = require('path');
+// const { Sequelize } = require('sequelize');
+// require('dotenv').config();
+// const fs = require('fs');
+// const path = require('path');
 
-const connectionString = process.env.DATABASE_URL;
-const caCert = process.env.PG_CA_CERT; // lấy CA từ env
+// const connectionString = process.env.DATABASE_URL;
+// const caCert = process.env.PG_CA_CERT; // lấy CA từ env
 
-if (!connectionString) {
-  throw new Error('DATABASE_URL is not defined in environment variables');
-}
+// if (!connectionString) {
+//   throw new Error('DATABASE_URL is not defined in environment variables');
+// }
 
-const sequelize = new Sequelize(connectionString, {
-  dialect: 'postgres',
-  protocol: 'postgres',
-  logging: false,
-  pool: {
-    max: 10,
-    min: 0,
-    acquire: 30000,
-    idle: 10000,
-  },
-  dialectOptions: {
-    ssl: {
-      require: true,
-      rejectUnauthorized: true, // verify chứng chỉ
-      ca: caCert,
-    },
-  },
-});
+// const sequelize = new Sequelize(connectionString, {
+//   dialect: 'postgres',
+//   protocol: 'postgres',
+//   logging: false,
+//   pool: {
+//     max: 10,
+//     min: 0,
+//     acquire: 30000,
+//     idle: 10000,
+//   },
+//   dialectOptions: {
+//     ssl: {
+//       require: true,
+//       rejectUnauthorized: true, // verify chứng chỉ
+//       ca: caCert,
+//     },
+//   },
+// });
 
 // Railway (và nhiều hosted Postgres) yêu cầu SSL; cấu hình sau đảm bảo kết nối OK.
 // const sequelize = new Sequelize(connectionString, {
@@ -49,5 +49,26 @@ const sequelize = new Sequelize(connectionString, {
 //     },
 //   },
 // });
+
+
+const { Sequelize } = require('sequelize');
+require('dotenv').config();
+
+const sequelize = new Sequelize(process.env.DATABASE_URL, {
+  dialect: 'postgres',
+  logging: false, // Tắt log SQL để terminal dễ nhìn hơn
+  dialectOptions: {
+    ssl: {
+      require: true,
+      rejectUnauthorized: false // Cho phép kết nối SSL mà không cần file CA cục bộ
+    }
+  },
+  pool: {
+    max: 5, // Với gói Free, nên để pool thấp để tránh lỗi "too many connections"
+    min: 0,
+    acquire: 30000,
+    idle: 10000
+  }
+});
 
 module.exports = sequelize;

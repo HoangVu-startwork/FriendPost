@@ -1,4 +1,6 @@
 const bcrypt = require('bcrypt');
+const path = require('path');
+const fs = require('fs');
 const { Sequelize } = require('sequelize');
 const User = require('../models/User');
 const Role = require('../models/Role');
@@ -227,6 +229,7 @@ exports.getUserInto = async (userId) => {
         username: user.username,
         sdt: user.sdt,
         avaturl: user.avatUrl,
+        avatUrlfacebook: user.avatUrlfacebook,
         giotinh: user.giotinh,
         ngaysinh: user.ngaysinh,
         rolr: role ? role.name : 'Chưa có vai trò'
@@ -262,13 +265,11 @@ exports.updateUserAvatar = async (userId, file) => {
     if (!file) {
         throw new Error('Vui lòng chọn ảnh để tải lên.');
     }
-
     const user = await User.findByPk(userId);
     if (!user) {
         fs.unlinkSync(file.path);
         throw new Error('Không tìm thấy người dùng.');
     }
-
     // Nếu user có avatar cũ → xóa khỏi Cloudinary
     if (user.avatUrl) {
         try {
@@ -280,18 +281,67 @@ exports.updateUserAvatar = async (userId, file) => {
             console.warn('⚠️ Không thể xóa ảnh cũ:', err.message);
         }
     }
-
     // Upload ảnh mới lên Cloudinary
     const filePath = path.join(__dirname, '..', file.path);
     const uploadResult = await uploadToCloudinary(filePath, 'avatars');
-
     // Cập nhật DB
     user.avatUrl = uploadResult.url;
     await user.save();
 
     return uploadResult.url;
 };
+exports.uploadavatUrlfacebook = async (userId, file) => {
+    // 1. Kiểm tra file đầu vào
+    if (!file || !file.buffer) {
+        throw new Error('Dữ liệu file không hợp lệ.');
+    }
 
+    const user = await User.findByPk(userId);
+    if (!user) {
+        throw new Error('Không tìm thấy người dùng.');
+    }
+
+    // 2. Logic xóa ảnh cũ (Bọc kín trong try-catch để nếu lỗi vẫn chạy tiếp)
+    if (user.avatUrlfacebook) {
+        try {
+            // Trích xuất publicId từ URL cũ
+            const parts = user.avatUrlfacebook.split('/');
+            const fileWithExt = parts[parts.length - 1]; // Gemini_Generated_Image...jpg
+            const publicId = 'avatars/' + fileWithExt.split('.')[0];
+            
+            console.log("🔄 Đang thử xóa ảnh cũ:", publicId);
+            await deleteFromCloudinary(publicId);
+        } catch (err) {
+            // Chỉ log cảnh báo, không ném lỗi (throw error) để tiến trình bên dưới vẫn chạy
+            console.warn('⚠️ Cảnh báo: Không thể xóa ảnh cũ trên Cloudinary, vẫn tiếp tục upload ảnh mới:', err.message);
+        }
+    }
+
+    // 3. Upload ảnh mới lên Cloudinary bằng Buffer (Dùng file.buffer)
+    try {
+        const uploadResult = await uploadToCloudinary(file.buffer, 'avatars', file.originalname);
+
+        // 4. Cập nhật Database với URL mới
+        user.avatUrlfacebook = uploadResult.url;
+        await user.save();
+
+        return uploadResult.url;
+    } catch (uploadError) {
+        console.error('❌ Lỗi khi upload ảnh mới:', uploadError);
+        throw new Error('Tải ảnh mới lên thất bại.');
+    }
+};
+
+
+
+exports.logoutUser = async (token) => {
+    // Nếu quản lý session trong Redis hoặc Database:
+    // logic: await SessionModel.deleteOne({ token });
+    
+    // Nếu bạn chỉ dùng JWT thuần túy (Stateless):
+    // Ở đây có thể để trống hoặc ghi log đăng xuất.
+    return true;
+}
 
 exports.registerUsersMang = async (usersData) => {
     if (!Array.isArray(usersData)) {
@@ -358,3 +408,4 @@ exports.registerUsersMang = async (usersData) => {
 
     return results;
 }
+

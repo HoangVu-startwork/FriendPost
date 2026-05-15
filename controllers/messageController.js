@@ -8,15 +8,15 @@ exports.sendMessageImg = async (req, res) => {
         console.log("id + " + req.user.id)
         const senderId = req.user.id;
         const { receiverId, content, contentType, replyToId, conversationId } = req.body;
-        const filePath = req.file ? req.file.path : null; // Lấy đường dẫn ảnh upload tạm
+        const fileBuffer = req.file ? req.file.buffer : null; // Lấy buffer thay vì path
         const originalName = req.file ? req.file.originalname : null;
-        console.log(filePath)
+        console.log(fileBuffer)
         const result = await messageService.sendMessageimage(
             senderId,
             receiverId,
             content,
             contentType,
-            filePath,
+            fileBuffer,
             originalName,
             replyToId,
             conversationId,
@@ -104,3 +104,14 @@ exports.markAsReadUpTo = async (req, res) => {
         });
     }
 };
+
+exports.getUnreadSummary = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const data = await messageService.getUnreadSummary(userId);
+
+        res.json(data);
+    } catch (error) {
+        res.status(500).json({ message: error.message })
+    }
+}

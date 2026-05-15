@@ -11,4 +11,6 @@ router.get('/getblock/:conversationId', verifyToken, messageController.getMessag
 // Gửi tin nhắn text hoặc ảnh
 router.post('/sendimg', verifyToken, upload.single('file'), messageController.sendMessageImg);
 router.put('/mark-read', verifyToken, messageController.markAsReadUpTo);
+
+
 module.exports = router;

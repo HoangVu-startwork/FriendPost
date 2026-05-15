@@ -80,7 +80,7 @@ exports.sendMessage1 = async (senderId, receiverId, content, replyToId = null) =
     };
 };
 
-exports.sendMessageimage = async (senderId, receiverId, content, contentType, filePath = null, originalName = null, replyToId = null, conversationId = null, io) => {
+exports.sendMessageimage = async (senderId, receiverId, content, contentType, fileBuffer = null, originalName = null, replyToId = null, conversationId = null, io) => {
     console.log(conversationId);
     if (senderId === receiverId) {
 
@@ -100,9 +100,9 @@ exports.sendMessageimage = async (senderId, receiverId, content, contentType, fi
         let finalContentType = 'text';
         let finalContent = content;
 
-        if (filePath) {
+        if (fileBuffer) {
             const uploadResult = await uploadToCloudinary(
-                filePath,
+                fileBuffer,
                 'messages',
                 originalName
             );
@@ -196,9 +196,9 @@ exports.sendMessageimage = async (senderId, receiverId, content, contentType, fi
     let finalContentType = 'text';
     let finalContent = content;
 
-    if (filePath) {
+    if (fileBuffer) {
         const uploadResult = await uploadToCloudinary(
-            filePath,
+            fileBuffer,
             'messages',
             originalName
         );
@@ -286,8 +286,6 @@ exports.sendMessageimage = async (senderId, receiverId, content, contentType, fi
             : null,
     };
 }
-
-
 
 exports.getConversationMessages = async (userId, conversationId) => {
     // Kiểm tra cuộc trò chuyện tồn tại
@@ -478,4 +476,22 @@ exports.markAsReadUpTo = async (userId, conversationId, lastMessageId) => {
     );
 
     return updatedCount;
+}
+
+
+exports.getUnreadSummary = async (userId) => {
+    const unreadMessages = await Message.findAll({
+        where: {
+            senderId: { [Op.ne]: userId },
+            isRead: false
+        },
+        attributes: [
+            "conversationId",
+            "senderId",
+            [Sequelize.fn("COUNT", Sequelize.col("id")), "unreadCount"]
+        ],
+        group: ["conversationId", "senderId"]
+    });
+
+    return unreadMessages;
 }
