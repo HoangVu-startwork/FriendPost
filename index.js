@@ -1,5 +1,6 @@
 const express = require('express');
 const http = require("http");
+require('dotenv').config();
 const { Server } = require("socket.io");
 const sequelize = require('./config/database');
 const userRoutes = require('./routes/userRoutes');
@@ -83,6 +84,12 @@ app.use('/api', Conversation);
 //   }
 //   console.log('🚀 Server chạy tại http://localhost:3000', process.env.PORT);
 // });
+
+console.log("--- Kiểm tra biến môi trường ---");
+console.log("PORT:", process.env.PORT);
+console.log("DB_URL:", process.env.DATABASE_URL ? "Đã nhận" : "Chưa nhận");
+console.log("CLOUDINARY_KEY:", process.env.CLOUDINARY_API_KEY ? "Đã nhận" : "Chưa nhận");
+
 server.listen(process.env.PORT, async () => {
   try {
     await sequelize.authenticate();
