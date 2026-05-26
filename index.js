@@ -15,7 +15,7 @@ const cors = require('cors');
 const cookieParser = require("cookie-parser");
 
 app.use(cors({
-  origin: 'http://localhost:3000',
+  origin: 'https://webpostsend.click',
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
@@ -29,7 +29,7 @@ const server = http.createServer(app);
 // khởi tạo xử lý socket
 // socketHandler(io);
 const io = new Server(server, {
-  cors: { origin: "http://localhost:3000", credentials: true }
+  cors: { origin: "https://webpostsend.click", credentials: true }
 });
 
 io.on("connection", (socket) => {
@@ -89,7 +89,6 @@ console.log("--- Kiểm tra biến môi trường ---");
 console.log("PORT:", process.env.PORT);
 console.log("DB_URL:", process.env.DATABASE_URL ? "Đã nhận" : "Chưa nhận");
 console.log("CLOUDINARY_KEY:", process.env.CLOUDINARY_API_KEY ? "Đã nhận" : "Chưa nhận");
-
 server.listen(process.env.PORT, async () => {
   try {
     await sequelize.authenticate();
