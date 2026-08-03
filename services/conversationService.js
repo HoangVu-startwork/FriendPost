@@ -19,7 +19,7 @@ const Topic = require('../models/Topic');
 // => Tin nhắn mới nhất → đứng đầu
 // => Conversation chưa có tin nhắn → tụt xuống dưới
 
-exports.getUserConversations = async (userId) => {
+exports.getUserConversations1 = async (userId) => {
     const conversations = await Conversation.findAll({
         where: {
             [Op.or]: [
@@ -97,6 +97,121 @@ exports.getUserConversations = async (userId) => {
     });
 };
 
+exports.getUserConversations = async (userId) => {
+    // 1. Lấy conversations
+    const conversations = await Conversation.findAll({
+        where: {
+            [Op.or]: [
+                { userOneId: userId },
+                { userTwoId: userId },
+                { createdBy: userId }
+            ]
+        },
+        include: [
+            {
+                model: User,
+                as: "userOne",
+                attributes: ["id", "username", "avatUrl"]
+            },
+            {
+                model: User,
+                as: "userTwo",
+                attributes: ["id", "username", "avatUrl"]
+            },
+            {
+                model: Topic,
+                as: "topic",
+                attributes: [
+                    "id",
+                    "label",
+                    "title",
+                    "img",
+                    "color",
+                    "color_1",
+                    "color_2",
+                    "color_icon"
+                ],
+                required: false
+            }
+        ]
+    });
+
+    // 2. Với mỗi conversation lấy tin nhắn mới nhất
+    const result = await Promise.all(
+        conversations.map(async (conv) => {
+            const plain = conv.get({ plain: true });
+
+            const lastMessage = await Message.findOne({
+                where: {
+                    conversationId: plain.id,
+                    message_status: {
+                        [Op.ne]: "delete"
+                    }
+                },
+                include: [
+                    {
+                        model: User,
+                        as: "sender",
+                        attributes: ["id", "username", "avatUrl"]
+                    }
+                ],
+                order: [["createdAt", "DESC"]]
+            });
+
+            let friend = null;
+
+            if (plain.type === "private") {
+                friend =
+                    plain.userOneId === userId
+                        ? plain.userTwo
+                        : plain.userOne;
+            }
+
+            delete plain.userOne;
+            delete plain.userTwo;
+
+            return {
+                ...plain,
+                friend,
+                lastMessage: lastMessage
+                    ? {
+                          id: lastMessage.id,
+                          content: lastMessage.content,
+                          contentType: lastMessage.contentType,
+                          senderId: lastMessage.senderId,
+                          sender: {
+                              id: lastMessage.sender?.id,
+                              username: lastMessage.sender?.username,
+                              avatUrl: lastMessage.sender?.avatUrl
+                          },
+                          isRead: lastMessage.isRead,
+                          status: lastMessage.status,
+                          message_status: lastMessage.message_status,
+                          createdAt: lastMessage.createdAt,
+                          updatedAt: lastMessage.updatedAt
+                      }
+                    : null
+            };
+
+
+        })
+    );
+
+    // 3. Sort theo last message mới nhất
+    result.sort((a, b) => {
+        const timeA = a.lastMessage
+            ? new Date(a.lastMessage.createdAt).getTime()
+            : new Date(a.createdAt).getTime();
+
+        const timeB = b.lastMessage
+            ? new Date(b.lastMessage.createdAt).getTime()
+            : new Date(b.createdAt).getTime();
+
+        return timeB - timeA;
+    });
+
+    return result;
+};
 
 
 exports.createGroupConversation = async ({ name, participantIds = [], creatorId }) => {

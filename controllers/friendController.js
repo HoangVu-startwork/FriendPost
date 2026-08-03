@@ -123,7 +123,7 @@ exports.getAcceptedRequest = async (req, res) => {
     try {
         const userId = req.user.id;
         const data = await friendService.getAccepted(userId);
-        res.json({ success: true, data: data });
+        res.json({ success: true, data: data, version: data.version });
     } catch (error) {
         res.status(400).json({ message: 'Lỗi hệ thống' });
     }
