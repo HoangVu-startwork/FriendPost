@@ -92,17 +92,58 @@ exports.createPostFb = async (content, file, userId, backgroundColor, privacy, u
         }, { transaction: t });
 
         // ===== Insert privacy list =====
-        if (['exclude', 'specific'].includes(privacy) && Array.isArray(userList) && userList.length > 0) {
+        // if (['exclude', 'specific'].includes(privacy) && Array.isArray(userList) && userList.length > 0) {
 
-            const privacyRows = userList.map(id => ({
-                postId: post.id,
-                userId: id,
-                type: privacy  // ⭐ LƯU TYPE
-            }));
+        //     const privacyRows = userList.map(id => ({
+        //         postId: post.id,
+        //         userId: id,
+        //         type: privacy  // ⭐ LƯU TYPE
+        //     }));
 
-            await PostPrivacyUser.bulkCreate(privacyRows, { transaction: t });
+        //     await PostPrivacyUser.bulkCreate(privacyRows, { transaction: t });
+        // }
+        // ===== Insert privacy list =====
+        let normalizedUserList = [];
+
+        if (Array.isArray(userList)) {
+            normalizedUserList = userList;
+        } else if (typeof userList === "string" && userList.trim()) {
+            try {
+                // "[1,2,3]"
+                if (userList.startsWith("[")) {
+                    normalizedUserList = JSON.parse(userList);
+                }
+                // "1,2,3"
+                else {
+                    normalizedUserList = userList
+                        .split(",")
+                        .map(id => Number(id.trim()))
+                        .filter(id => !isNaN(id));
+                }
+            } catch (err) {
+                console.error("Parse userList error:", err);
+                normalizedUserList = [];
+            }
         }
 
+        if (
+            ["exclude", "specific"].includes(privacy) &&
+            normalizedUserList.length > 0
+        ) {
+
+            const privacyRows = normalizedUserList.map(id => ({
+                postId: post.id,
+                userId: Number(id),
+                type: privacy
+            }));
+
+            console.log("privacyRows:", privacyRows);
+
+            await PostPrivacyUser.bulkCreate(
+                privacyRows,
+                { transaction: t }
+            );
+        }
         await t.commit();
         return post;
 
@@ -387,7 +428,7 @@ exports.getSmartFeed = async (currentUserId) => {
                 { userId: currentUserId }, // Dù privacy gì bạn vẫn thấy bài của mình.
                 { privacy: 'public', userId: { [Op.in]: friendIds } }, // Bài public từ những người là bạn
                 { privacy: 'friends', userId: { [Op.in]: friendIds } }, // Bài chỉ dành cho bạn bè → bạn là bạn của họ nên thấy được
-                { privacy: 'specific', id: { [Op.in]: specificPostIds } }, // Những bài người khác chọn đích danh bạn xem
+                { privacy: 'specific', id: { [Op.in]: excludedPostIds } }, // Những bài người khác chọn đích danh bạn xem
                 { privacy: 'exclude', id: { [Op.notIn]: excludedPostIds } } // Bài dạng “ai cũng xem được TRỪ người chỉ định”
             ]
         },
@@ -731,7 +772,7 @@ exports.getSmartFeed13 = async (currentUserId, page = 1, limit = 20, seed) => {
     });
 
 
-    const mixedSource = [...friendPostsRaw, ...strangerPostsRaw] .sort((a, b) => { const timeDiff = new Date(b.createdAt) - new Date(a.createdAt); return timeDiff + (Math.random() - 0.5) * 1000 * 60 * 60 * 6; });
+    const mixedSource = [...friendPostsRaw, ...strangerPostsRaw].sort((a, b) => { const timeDiff = new Date(b.createdAt) - new Date(a.createdAt); return timeDiff + (Math.random() - 0.5) * 1000 * 60 * 60 * 6; });
 
 
     const postsByUser = {};
@@ -886,12 +927,23 @@ exports.getSmartFeed12 = async (currentUserId, page = 1, limit = 20, seed) => {
     );
 
     // ====== PRIVACY ======
-    const specificRows = await PostPrivacyUser.findAll({
-        where: { userId: currentUserId }
+    // const specificRows = await PostPrivacyUser.findAll({
+    //     where: { userId: currentUserId }
+    // });
+    const privacyRows = await PostPrivacyUser.findAll({
+        where: {
+            userId: currentUserId
+        }
     });
+    // const specificPostIds = specificRows.map(p => p.postId);
+    // const excludedPostIds = specificRows.map(p => p.postId);
+    const specificPostIds = privacyRows
+        .filter(p => p.type === "specific")
+        .map(p => p.postId);
 
-    const specificPostIds = specificRows.map(p => p.postId);
-    const excludedPostIds = specificRows.map(p => p.postId);
+    const excludedPostIds = privacyRows
+        .filter(p => p.type === "exclude")
+        .map(p => p.postId);
 
     // 🔥 LẤY DƯ DỮ LIỆU (KHÔNG OFFSET)
     const FETCH_LIMIT = limit * 5;
@@ -902,11 +954,42 @@ exports.getSmartFeed12 = async (currentUserId, page = 1, limit = 20, seed) => {
             display: 'presently',
             createdAt: { [Op.gte]: oneMonthAgo },
             [Op.or]: [
-                { userId: currentUserId },
-                { privacy: 'public', userId: { [Op.in]: friendIds } },
-                { privacy: 'friends', userId: { [Op.in]: friendIds } },
-                { privacy: 'specific', id: { [Op.in]: specificPostIds } },
-                { privacy: 'exclude', id: { [Op.notIn]: excludedPostIds } }
+                // bài của chính mình
+                {
+                    userId: currentUserId
+                },
+
+                // public ai cũng xem được
+                {
+                    privacy: "public"
+                },
+
+                // chỉ bạn bè
+                {
+                    privacy: "friends",
+                    userId: {
+                        [Op.in]: friendIds
+                    }
+                },
+
+                // chỉ những người được chọn
+                {
+                    privacy: "specific",
+                    id: {
+                        [Op.in]: specificPostIds
+                    }
+                },
+
+                // bạn bè trừ người bị loại
+                {
+                    privacy: "exclude",
+                    userId: {
+                        [Op.in]: friendIds
+                    },
+                    id: {
+                        [Op.notIn]: excludedPostIds
+                    }
+                }
             ]
         },
         include: [{ model: User, attributes: ['id', 'username', 'avatUrl'] }],

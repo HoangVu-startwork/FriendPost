@@ -62,6 +62,7 @@ exports.getMessagesblock = async (req, res) => {
     }
 }
 
+// đánh dấu tất cả tin nhắn đã đọc từ đầu cuộc hội thoại đến một tin nhắn cuối cùng
 exports.markAsReadUpTo = async (req, res) => {
     try {
         const userId = req.user.id;

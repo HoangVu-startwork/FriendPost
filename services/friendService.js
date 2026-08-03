@@ -418,11 +418,26 @@ exports.getAccepted = async (userId) => {
     });
 
     // Format data: chỉ trả về thông tin người còn lại
-    return requests.map(req => {
+    // return requests.map(req => {
+    //     const friend =
+    //         req.senderId === userId
+    //             ? req.receiver   // user là sender → bạn là receiver
+    //             : req.sender;    // user là receiver → bạn là sender
+
+    //     return {
+    //         friendId: friend.id,
+    //         username: friend.username,
+    //         email: friend.email,
+    //         sdt: friend.sdt,
+    //         avatUrl: friend.avatUrl,
+    //         createdAt: req.createdAt
+    //     };
+    // });
+    const data = requests.map(req => {
         const friend =
             req.senderId === userId
-                ? req.receiver   // user là sender → bạn là receiver
-                : req.sender;    // user là receiver → bạn là sender
+                ? req.receiver
+                : req.sender;
 
         return {
             friendId: friend.id,
@@ -433,6 +448,13 @@ exports.getAccepted = async (userId) => {
             createdAt: req.createdAt
         };
     });
+
+    return {
+        data,
+        version: requests.length
+            ? requests[0].updatedAt.getTime()
+            : 0
+    };
 }
 
 exports.getBlocked = async (userId) => {

@@ -6,6 +6,7 @@ const { Sequelize, Op } = require('sequelize');
 const ChatStatus = require('../models/ChatStatus');
 const User = require('../models/User');
 const { uploadToCloudinary } = require('./cloudinaryService');
+const conversationService = require('./conversationService')
 
 
 exports.sendMessage1 = async (senderId, receiverId, content, replyToId = null) => {
@@ -276,6 +277,15 @@ exports.sendMessageimage = async (senderId, receiverId, content, contentType, fi
 
     io.to(`conversation_${conversation.id}`).emit("newConversationmes", formattedMessage);
 
+    io.to(`user_${senderId}`).emit("conversationUpdated", {
+        conversationId: conversation.id,
+        lastMessage: formattedMessage
+    });
+    
+    io.to(`user_${receiverId}`).emit("conversationUpdated", {
+        conversationId: conversation.id,
+        lastMessage: formattedMessage
+    });
 
     return {
         message,
@@ -287,6 +297,9 @@ exports.sendMessageimage = async (senderId, receiverId, content, contentType, fi
     };
 }
 
+///
+
+///
 exports.getConversationMessages = async (userId, conversationId) => {
     // Kiểm tra cuộc trò chuyện tồn tại
     const conversation = await Conversation.findByPk(conversationId);
@@ -429,7 +442,7 @@ exports.getConversationMessagesblock = async (userId, conversationId) => {
     return result;
 };
 
-
+// đánh dấu tất cả tin nhắn đã đọc từ đầu cuộc hội thoại đến một tin nhắn cuối cùng
 exports.markAsReadUpTo = async (userId, conversationId, lastMessageId) => {
     // Kiểm tra conversation tồn tại
     const conversation = await Conversation.findByPk(conversationId);

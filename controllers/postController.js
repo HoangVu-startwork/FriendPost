@@ -31,6 +31,7 @@ exports.createPostFb1 = async (req, res) => {
   }
 };
 
+// Sử dụng cái này
 exports.createPostFb = async (req, res) => {
   try {
     const { content, backgroundColor, privacy, userList } = req.body;
