@@ -561,7 +561,8 @@ exports.markAsReadUpTo = async (userId, conversationId, lastMessageId) => {
                 conversationId,
                 senderId: { [Op.ne]: userId }, // quan trọng: không update tin của chính mình
                 id: { [Op.lte]: lastMessageId },
-                isRead: false
+                isRead: false,
+                
             }
         }
     );

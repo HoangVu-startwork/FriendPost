@@ -92,6 +92,14 @@ exports.markAsReadUpTo = async (req, res) => {
                 isRead: true,
                 updatedAt: now
             });
+
+            // 🔥 Xóa badge
+            req.io
+                .to(`user_${userId}`)
+                .emit("conversationUpdated", {
+                    conversationId,
+                    unreadCount: 0
+                });
         }
 
         return res.json({
