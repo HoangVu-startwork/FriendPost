@@ -141,22 +141,68 @@ exports.getUserConversations = async (userId) => {
         conversations.map(async (conv) => {
             const plain = conv.get({ plain: true });
 
-            const lastMessage = await Message.findOne({
-                where: {
-                    conversationId: plain.id,
-                    message_status: {
-                        [Op.ne]: "delete"
+
+
+            // const lastMessage = await Message.findOne({
+            //     where: {
+            //         conversationId: plain.id,
+            //         message_status: {
+            //             [Op.ne]: "delete"
+            //         }
+            //     },
+            //     include: [
+            //         {
+            //             model: User,
+            //             as: "sender",
+            //             attributes: ["id", "username", "avatUrl"]
+            //         }
+            //     ],
+            //     order: [["createdAt", "DESC"]]
+            // });
+
+            // Lấy tin nhắn cuối + unread (tin nhắn chưa đọc)
+            const [lastMessage, unreadCount] = await Promise.all([
+
+                Message.findOne({
+                    where: {
+                        conversationId: plain.id,
+                        message_status: {
+                            [Op.ne]: "delete"
+                        }
+                    },
+                    include: [
+                        {
+                            model: User,
+                            as: "sender",
+                            attributes: [
+                                "id",
+                                "username",
+                                "avatUrl"
+                            ]
+                        }
+                    ],
+                    order: [["createdAt", "DESC"]]
+                }),
+
+                // =========================
+                // ĐẾM TIN CHƯA ĐỌC
+                // Chỉ đếm tin người khác gửi
+                // =========================
+                Message.count({
+                    where: {
+                        conversationId: plain.id,
+
+                        senderId: {
+                            [Op.ne]: userId
+                        },
+
+                        isRead: false,
+
+                        message_status: "show"
                     }
-                },
-                include: [
-                    {
-                        model: User,
-                        as: "sender",
-                        attributes: ["id", "username", "avatUrl"]
-                    }
-                ],
-                order: [["createdAt", "DESC"]]
-            });
+                })
+            ]);
+
 
             let friend = null;
 
@@ -173,23 +219,25 @@ exports.getUserConversations = async (userId) => {
             return {
                 ...plain,
                 friend,
+                // Số tin chưa đọc
+                unreadCount,
                 lastMessage: lastMessage
                     ? {
-                          id: lastMessage.id,
-                          content: lastMessage.content,
-                          contentType: lastMessage.contentType,
-                          senderId: lastMessage.senderId,
-                          sender: {
-                              id: lastMessage.sender?.id,
-                              username: lastMessage.sender?.username,
-                              avatUrl: lastMessage.sender?.avatUrl
-                          },
-                          isRead: lastMessage.isRead,
-                          status: lastMessage.status,
-                          message_status: lastMessage.message_status,
-                          createdAt: lastMessage.createdAt,
-                          updatedAt: lastMessage.updatedAt
-                      }
+                        id: lastMessage.id,
+                        content: lastMessage.content,
+                        contentType: lastMessage.contentType,
+                        senderId: lastMessage.senderId,
+                        sender: {
+                            id: lastMessage.sender?.id,
+                            username: lastMessage.sender?.username,
+                            avatUrl: lastMessage.sender?.avatUrl
+                        },
+                        isRead: lastMessage.isRead,
+                        status: lastMessage.status,
+                        message_status: lastMessage.message_status,
+                        createdAt: lastMessage.createdAt,
+                        updatedAt: lastMessage.updatedAt
+                    }
                     : null
             };
 
