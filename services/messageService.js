@@ -269,23 +269,101 @@ exports.sendMessageimage = async (senderId, receiverId, content, contentType, fi
         message_status: plainMsg.message_status,
         contentType: plainMsg.contentType,
         status: plainMsg.status,
+        isRead: plainMsg.isRead,
         createdAt: formatDate(plainMsg.createdAt),
         updatedAt: formatDate(plainMsg.updatedAt),
         replyToId: plainMsg.replyToId,
         senderId: plainMsg.senderId
     };
 
+    // =====================================================
+    // GỬI TIN NHẮN CHO NHỮNG NGƯỜI ĐANG MỞ CHATBOX
+    // =====================================================
     io.to(`conversation_${conversation.id}`).emit("newConversationmes", formattedMessage);
 
+    // =====================================================
+    // Cập nhật conversation của người gửi
+    // Sender không cần unread
+    // =====================================================
     io.to(`user_${senderId}`).emit("conversationUpdated", {
         conversationId: conversation.id,
-        lastMessage: formattedMessage
+        lastMessage: formattedMessage,
+        unreadCount: 0
     });
-    
-    io.to(`user_${receiverId}`).emit("conversationUpdated", {
-        conversationId: conversation.id,
-        lastMessage: formattedMessage
-    });
+
+
+    const receiverSockets =
+        await io
+            .in(`user_${receiverId}`)
+            .fetchSockets();
+
+    const receiverIsViewing =
+        receiverSockets.some((socket) =>
+            socket.rooms.has(
+                `conversation_${conversation.id}`
+            )
+        );
+
+
+    // io.to(`user_${receiverId}`).emit("conversationUpdated", {
+    //     conversationId: conversation.id,
+    //     lastMessage: formattedMessage,
+    // });
+
+    if (receiverIsViewing) {
+        // Đang mở ChatBox
+        // Không có unread
+        io.to(`user_${receiverId}`).emit(
+            "conversationUpdated",
+            {
+                conversationId:
+                    conversation.id,
+
+                lastMessage:
+                    formattedMessage,
+
+                unreadCount: 0
+            }
+        );
+
+
+        // =====================================================
+        // Receiver KHÔNG mở ChatBox
+        // Tăng unread
+        // =====================================================
+
+    } else {
+
+        const unreadCount =
+            await Message.count({
+                where: {
+                    conversationId:
+                        conversation.id,
+
+                    senderId: {
+                        [Op.ne]: receiverId
+                    },
+
+                    isRead: false,
+
+                    message_status: "show"
+                }
+            });
+
+
+        io.to(`user_${receiverId}`).emit(
+            "conversationUpdated",
+            {
+                conversationId:
+                    conversation.id,
+
+                lastMessage:
+                    formattedMessage,
+
+                unreadCount
+            }
+        );
+    }
 
     return {
         message,
