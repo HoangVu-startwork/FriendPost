@@ -304,7 +304,7 @@ exports.sendMessageimage = async (senderId, receiverId, content, contentType, fi
             )
         );
 
-
+        // chỉnh sửa
     io.to(`user_${receiverId}`).emit("conversationUpdated", {
         conversationId: conversation.id,
         lastMessage: formattedMessage,
