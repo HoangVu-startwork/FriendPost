@@ -305,10 +305,10 @@ exports.sendMessageimage = async (senderId, receiverId, content, contentType, fi
         );
 
 
-    // io.to(`user_${receiverId}`).emit("conversationUpdated", {
-    //     conversationId: conversation.id,
-    //     lastMessage: formattedMessage,
-    // });
+    io.to(`user_${receiverId}`).emit("conversationUpdated", {
+        conversationId: conversation.id,
+        lastMessage: formattedMessage,
+    });
 
     if (receiverIsViewing) {
         // Đang mở ChatBox
@@ -346,7 +346,7 @@ exports.sendMessageimage = async (senderId, receiverId, content, contentType, fi
 
                     isRead: false,
 
-                    message_status: "show"
+                    // message_status: "show"
                 }
             });
 
