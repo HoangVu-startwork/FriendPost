@@ -1237,3 +1237,253 @@ exports.getSmartFeedget = async (currentUserId) => {
 
     // Khi 10 bài post sẽ xuất hiện 1 bài post của người không phải bạn
 }
+
+
+// Post video
+exports.getPostvideo = async (currentUserId, page = 1, limit = 20, seed) => {
+
+    // ====== SEED RANDOM THEO PHIÊN ======
+    const seedBase = seed || `${currentUserId}`;
+    const rng = seedrandom(`${seedBase}-${currentUserId}`);
+
+    const offset = (page - 1) * limit;
+
+    // ====== CHỈ LẤY BÀI TRONG 1 THÁNG ======
+    const oneMonthAgo = new Date();
+    oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+
+    // ====== FRIEND IDS ======
+    const friends = await FriendRequest.findAll({
+        where: {
+            status: 'accepted',
+            [Op.or]: [
+                { senderId: currentUserId },
+                { receiverId: currentUserId }
+            ]
+        }
+    });
+
+    const friendIds = friends.map(f =>
+        f.senderId === currentUserId ? f.receiverId : f.senderId
+    );
+
+    // ====== PRIVACY ======
+    // const specificRows = await PostPrivacyUser.findAll({
+    //     where: { userId: currentUserId }
+    // });
+    const privacyRows = await PostPrivacyUser.findAll({
+        where: {
+            userId: currentUserId
+        }
+    });
+    // const specificPostIds = specificRows.map(p => p.postId);
+    // const excludedPostIds = specificRows.map(p => p.postId);
+    const specificPostIds = privacyRows
+        .filter(p => p.type === "specific")
+        .map(p => p.postId);
+
+    const excludedPostIds = privacyRows
+        .filter(p => p.type === "exclude")
+        .map(p => p.postId);
+
+    // 🔥 LẤY DƯ DỮ LIỆU (KHÔNG OFFSET)
+    const FETCH_LIMIT = limit * 5;
+
+    // ====== FRIEND POSTS ======
+    const friendPostsRaw = await Post.findAll({
+        where: {
+            display: 'presently',
+            mediaType: 'video',
+            createdAt: { [Op.gte]: oneMonthAgo },
+            [Op.or]: [
+                // bài của chính mình
+                {
+                    userId: currentUserId
+                },
+
+                // public ai cũng xem được
+                {
+                    privacy: "public"
+                },
+
+                // chỉ bạn bè
+                {
+                    privacy: "friends",
+                    userId: {
+                        [Op.in]: friendIds
+                    }
+                },
+
+                // chỉ những người được chọn
+                {
+                    privacy: "specific",
+                    id: {
+                        [Op.in]: specificPostIds
+                    }
+                },
+
+                // bạn bè trừ người bị loại
+                {
+                    privacy: "exclude",
+                    userId: {
+                        [Op.in]: friendIds
+                    },
+                    id: {
+                        [Op.notIn]: excludedPostIds
+                    }
+                }
+            ]
+        },
+        include: [{ model: User, attributes: ['id', 'username', 'avatUrl'] }],
+        order: [['createdAt', 'DESC']],
+        limit: FETCH_LIMIT,
+        offset: 0
+    });
+
+    // ====== STRANGER POSTS ======
+    const strangerPostsRaw = await Post.findAll({
+        where: {
+            display: 'presently',
+            mediaType: 'video',
+            privacy: 'public',
+            createdAt: { [Op.gte]: oneMonthAgo },
+            userId: { [Op.notIn]: [currentUserId, ...friendIds] }
+        },
+        include: [{ model: User, attributes: ['id', 'username', 'avatUrl'] }],
+        order: [['createdAt', 'DESC']],
+        limit: Math.floor(FETCH_LIMIT / 5),
+        offset: 0
+    });
+
+    // ====== TRỘN BÀI CÓ SEED (KHÔNG DÙNG Math.random) ======
+    const mixedSource = [...friendPostsRaw, ...strangerPostsRaw].sort((a, b) => {
+        const timeDiff = new Date(b.createdAt) - new Date(a.createdAt);
+        const randomBias = (rng() - 0.5) * 1000 * 60 * 60 * 6; // ±6 tiếng
+        return timeDiff + randomBias;
+    });
+
+    // ====== GROUP THEO USER ======
+    const postsByUser = {};
+    mixedSource.forEach(post => {
+        if (!postsByUser[post.userId]) {
+            postsByUser[post.userId] = [];
+        }
+        postsByUser[post.userId].push(post);
+    });
+
+    // ====== LUÂN PHIÊN USER ======
+    let userQueues = Object.values(postsByUser);
+
+    // 👉 random thứ tự user bằng seed
+    userQueues.sort(() => rng() - 0.5);
+
+    const finalFeedAll = [];
+
+    while (userQueues.length > 0) {
+        let picked = false;
+
+        for (let i = userQueues.length - 1; i >= 0; i--) {
+            const queue = userQueues[i];
+
+            if (!queue.length) {
+                userQueues.splice(i, 1);
+                continue;
+            }
+
+            const lastPost = finalFeedAll[finalFeedAll.length - 1];
+
+            if (!lastPost || String(lastPost.userId) !== String(queue[0].userId)) {
+                finalFeedAll.push(queue.shift());
+                picked = true;
+            }
+        }
+
+        if (!picked && userQueues.length) {
+            finalFeedAll.push(userQueues[0].shift());
+        }
+    }
+
+    // ====== CẮT THEO PAGE (QUAN TRỌNG) ======
+    const start = offset;
+    const end = offset + limit;
+    const finalFeed = finalFeedAll.slice(start, end);
+
+    // ====== REACTIONS + VIEWS ======
+    const postIds = finalFeed.map(p => p.id);
+
+    const views = await PostView.findAll({
+        where: { postId: { [Op.in]: postIds } },
+        attributes: [
+            'postId',
+            [Sequelize.fn('COUNT', Sequelize.col('userId')), 'viewCount']
+        ],
+        group: ['postId']
+    });
+
+    const viewMap = {};
+    views.forEach(v => {
+        viewMap[v.postId] = parseInt(v.get('viewCount'));
+    });
+
+    const reactions = await PostReaction.findAll({
+        where: { postId: { [Op.in]: postIds } },
+        include: [{ model: Reaction, attributes: ['code', 'label', 'icon'] }]
+    });
+
+    const userReactions = await PostReaction.findAll({
+        where: {
+            postId: { [Op.in]: postIds },
+            userId: currentUserId
+        },
+        include: [{ model: Reaction, attributes: ['code', 'label', 'icon', 'color'] }]
+    });
+
+    const userReactionMap = {};
+    userReactions.forEach(r => {
+        userReactionMap[r.postId] = {
+            code: r.Reaction.code,
+            label: r.Reaction.label,
+            icon: r.Reaction.icon,
+            color: r.Reaction.color
+        };
+    });
+
+    const reactionMap = {};
+    reactions.forEach(r => {
+        if (!reactionMap[r.postId]) {
+            reactionMap[r.postId] = { total: 0, detail: {} };
+        }
+        const code = r.Reaction.code;
+        if (!reactionMap[r.postId].detail[code]) {
+            reactionMap[r.postId].detail[code] = {
+                code,
+                label: r.Reaction.label,
+                icon: r.Reaction.icon,
+                count: 0
+            };
+        }
+        reactionMap[r.postId].detail[code].count++;
+        reactionMap[r.postId].total++;
+    });
+
+    const resultFeed = finalFeed.map(post => {
+        const p = post.toJSON();
+        const r = reactionMap[p.id];
+
+        p.reactions = r
+            ? { total: r.total, detail: Object.values(r.detail) }
+            : { total: 0, detail: [] };
+
+        p.views = viewMap[p.id] || 0;
+        p.myReaction = userReactionMap[p.id] || null;
+        return p;
+    });
+
+    // ====== HAS MORE ======
+    const hasMore = end < finalFeedAll.length;
+
+    return {
+        posts: resultFeed,
+        pagination: { page, limit, hasMore }
+    };
+};
