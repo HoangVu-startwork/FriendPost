@@ -131,6 +131,27 @@ exports.getUserPosts12 = async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 }
+
+exports.getUserPostVideo = async (req, res) => {
+  try {
+    const currentUserId = req.user.id;
+
+    // 📌 lấy từ query, nếu không có thì dùng mặc định
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const seed = req.query.seed;
+    const posts = await postService.getPostvideo(currentUserId, page, limit, seed);
+
+    res.json({
+      success: true,
+      const: posts.length,
+      data: posts
+    })
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error' });
+  }
+}
 //
 
 exports.viewPost = async (req, res) => {

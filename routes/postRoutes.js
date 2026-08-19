@@ -20,4 +20,7 @@ router.post('/post/view/:postId', verifyToken, postController.viewPost);
 router.get('/post/reactions', verifyToken, postController.getAllReactions);
 // getUserPosts12
 router.get('/post1/postfbuser', verifyToken, postController.getUserPosts12);
+
+// getUserPostVideo
+router.get('/post/video', verifyToken, postController.getUserPostVideo);
 module.exports = router;
